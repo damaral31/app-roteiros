@@ -1,0 +1,16 @@
+name: travel-architect
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - streamlit
+    - folium
+    - streamlit-folium
+    - streamlit-sortables
+    - googlemaps
+    - geopy
+    - pandas
+    - watchdog  # Útil para reload automático rápido durante o dev

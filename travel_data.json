@@ -1,0 +1,112 @@
+{
+    "24c7a4a5-8465-4a2d-a3f0-bc51696fc2ee": {
+        "id": "24c7a4a5-8465-4a2d-a3f0-bc51696fc2ee",
+        "name": "New York",
+        "lat": 40.748444,
+        "lon": -73.985667,
+        "img": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg",
+        "pois": [
+            {
+                "id": "04ce52ce-2b3e-45a4-9a97-2dd16bfd31d3",
+                "name": "Hotel Nirvana",
+                "lat": 40.764031298276436,
+                "lon": -73.97060394287111,
+                "type": "hotel",
+                "day": 0,
+                "period": "Base",
+                "time_min": 0
+            }
+        ]
+    },
+    "9c0b8eb7-b63c-470d-a683-91746468448f": {
+        "id": "9c0b8eb7-b63c-470d-a683-91746468448f",
+        "name": "Genebra",
+        "lat": 46.204111,
+        "lon": 6.143417,
+        "img": "https://www.grupodicas.com/wp-content/uploads/2023/07/23bf4300-f586-11e8-b8fa-0242ac11000d.png",
+        "pois": [
+            {
+                "id": "baa1eeb5-a2b1-4860-92c9-99d6e37c5132",
+                "name": "MEININGER Hotel Geneve Charmilles",
+                "lat": 46.209306,
+                "lon": 6.121528,
+                "type": "hotel",
+                "day": 0,
+                "period": "Base",
+                "time_min": 0
+            },
+            {
+                "id": "dd037671-49b8-404a-9ed0-3268c27c300a",
+                "name": "Pointe de la Jonction ",
+                "lat": 46.2011732,
+                "lon": 6.1261127,
+                "time_min": 0,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 1,
+                "period": "Manhã",
+                "transit_prev": 11
+            },
+            {
+                "id": "7ccd4226-218f-4211-98da-b36905a36a69",
+                "name": "Patek Philippe Museum",
+                "lat": 46.198472,
+                "lon": 6.138306,
+                "time_min": 60,
+                "cost": 7.0,
+                "type": "visit",
+                "day": 1,
+                "period": "Manhã",
+                "transit_prev": 11
+            },
+            {
+                "id": "f1296694-33be-4884-b873-f0d27d583201",
+                "name": "Catedral de São Pedro de Genebra",
+                "lat": 46.2010858,
+                "lon": 6.1484997,
+                "time_min": 60,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 1,
+                "period": "Manhã",
+                "transit_prev": 10
+            },
+            {
+                "id": "ce66dffd-f151-45a4-8323-0593c3c632c2",
+                "name": "Place du Bourg-de-Four",
+                "lat": 46.2005994,
+                "lon": 6.1493021,
+                "time_min": 0,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 1,
+                "period": "Manhã",
+                "transit_prev": 0
+            },
+            {
+                "id": "abef63e7-9760-4928-b256-7ac4f585e2ae",
+                "name": "Jardim Inglês",
+                "lat": 46.20420572040412,
+                "lon": 6.151549816131593,
+                "time_min": 60,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 1,
+                "period": "Manhã",
+                "transit_prev": 5
+            },
+            {
+                "id": "98e9124b-1e3e-40bb-a4ed-eec6a9fa4261",
+                "name": "Monte Saleve",
+                "lat": 46.162639,
+                "lon": 6.189333,
+                "time_min": 300,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 2,
+                "period": "Manhã",
+                "transit_prev": 88
+            }
+        ]
+    }
+}
