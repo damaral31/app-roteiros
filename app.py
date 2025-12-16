@@ -16,6 +16,7 @@ st.set_page_config(page_title="AI Travel Planner", layout="wide", page_icon="�
 
 DATA_FILE = "travel_data.json"
 WALKING_SPEED_KMH = 5.0
+DRIVING_SPEED_KMH = 35.0  # Velocidade média carro em cidade (para Hotel -> POI)
 TOLERANCIA_MINUTOS = 30 
 
 # --- FUNÇÃO DE CONVERSÃO DE COORDENADAS ---
@@ -42,7 +43,7 @@ def parse_coordinate(coord_input):
 def search_place_nominatim(query):
     """Pesquisa local usando OpenStreetMap (Gratuito)."""
     try:
-        geolocator = Nominatim(user_agent="travel_architect_ai_app_final_v4")
+        geolocator = Nominatim(user_agent="travel_architect_ai_app_final_v5_addr")
         location = geolocator.geocode(query, timeout=10)
         if location:
             return location.latitude, location.longitude, location.address
@@ -80,8 +81,20 @@ class TravelOptimizer:
         for p1 in all_nodes:
             for p2 in all_nodes:
                 if p1['id'] == p2['id']: continue
+                
+                # Calcula distancia geodésica em KM
                 dist = geodesic((p1['lat'], p1['lon']), (p2['lat'], p2['lon'])).km
-                self.dist_matrix[(p1['id'], p2['id'])] = int((dist / WALKING_SPEED_KMH) * 60)
+                
+                # LÓGICA DE VELOCIDADE:
+                # Se p1 (origem) for o Hotel, assumimos que vai de Carro/Uber
+                if p1.get('type') == 'hotel':
+                    speed = DRIVING_SPEED_KMH
+                else:
+                    # Se p1 for um local turístico, assumimos caminhada até o próximo
+                    speed = WALKING_SPEED_KMH
+                
+                # Calcula tempo em minutos
+                self.dist_matrix[(p1['id'], p2['id'])] = int((dist / speed) * 60)
 
     def _evaluate_schedule(self, ordered_pois):
         schedule = []
@@ -109,6 +122,7 @@ class TravelOptimizer:
                 else: i += 1
             
             # Tarde
+            # Se terminou a manhã num POI, continua a pé. Se não teve manhã, sai do hotel (carro).
             loc_atual = manha_pois[-1] if manha_pois else self.hotel
             tempo_gasto = 0
             tarde_pois = []
@@ -231,9 +245,10 @@ def render_dashboard():
 def render_stylish_card(poi, city_id, is_first=False):
     """Renderiza um cartão visualmente rico para o Roteiro."""
     if not is_first and 'transit_prev' in poi and poi['transit_prev'] > 0:
+        icon_transit = "🚗" if poi.get('transit_prev') > 45 else "🚶"
         st.markdown(f"""
         <div style="text-align: center; color: #888; font-size: 0.8em; margin: 5px 0;">
-            ⋮<br>🚶 <i>{poi['transit_prev']} min caminhada</i><br>⋮
+            ⋮<br>{icon_transit} <i>{poi['transit_prev']} min deslocamento</i><br>⋮
         </div>
         """, unsafe_allow_html=True)
 
@@ -281,7 +296,6 @@ def render_city_planner(city_id):
     with col_map:
         DAY_COLORS = ['green', 'purple', 'orange', 'red', 'darkblue', 'cadetblue', 'darkred']
         
-        # Mapa reinicia sempre no centro da cidade (zoom e posição não mantidos propositadamente)
         m = folium.Map([city['lat'], city['lon']], zoom_start=13)
         
         for p in city['pois']:
@@ -317,13 +331,10 @@ def render_city_planner(city_id):
                         break
 
             # 2. Detetar clique no vazio (Prioridade: PREENCHER INPUTS)
-            # Apenas se não clicou num objeto e se as coordenadas forem NOVAS
             if map_data.get("last_clicked") and not clicked_poi:
                 new_lat = str(map_data["last_clicked"]["lat"])
                 new_lon = str(map_data["last_clicked"]["lng"])
                 
-                # CORREÇÃO: Verifica se os valores são diferentes antes de atualizar e recarregar
-                # Isso evita que o frontend bloqueie ou não atualize visualmente
                 if new_lat != st.session_state['new_poi_lat'] or new_lon != st.session_state['new_poi_lon']:
                     st.session_state['new_poi_lat'] = new_lat
                     st.session_state['new_poi_lon'] = new_lon
@@ -334,10 +345,10 @@ def render_city_planner(city_id):
             with st.container(border=True):
                 st.info(f"📍 Selecionado no Mapa: **{clicked_poi['name']}**")
                 if st.button("🗑️ Eliminar este local do mapa", key=f"del_map_{clicked_poi['id']}", type="primary", use_container_width=True):
-                     st.session_state['cities'][city_id]['pois'] = [p for p in st.session_state['cities'][city_id]['pois'] if p['id'] != clicked_poi['id']]
-                     save_data()
-                     st.toast(f"Local '{clicked_poi['name']}' removido!")
-                     st.rerun()
+                      st.session_state['cities'][city_id]['pois'] = [p for p in st.session_state['cities'][city_id]['pois'] if p['id'] != clicked_poi['id']]
+                      save_data()
+                      st.toast(f"Local '{clicked_poi['name']}' removido!")
+                      st.rerun()
 
     with col_data:
         tabs = st.tabs(["📝 Novo Local", "📅 Roteiro", "⚙️ Otimizar"])
@@ -345,7 +356,7 @@ def render_city_planner(city_id):
         with tabs[0]:
             st.markdown("##### 🔍 Pesquisa & Adição")
             c_search, c_btn = st.columns([3, 1])
-            search_query = c_search.text_input("Pesquisar Local", label_visibility="collapsed", placeholder="Ex: Torre Eiffel")
+            search_query = c_search.text_input("Pesquisar Local", label_visibility="collapsed", placeholder="Ex: Torre Eiffel ou Av. Liberdade, Lisboa")
             
             if c_btn.button("🔍"):
                 if search_query:
@@ -363,6 +374,24 @@ def render_city_planner(city_id):
             is_hotel = st.checkbox("É o Hotel/Base?")
             name = st.text_input("Nome", key="new_poi_name")
             
+            # --- NOVA FEATURE: ADICIONAR POR ENDEREÇO MANUAL ---
+            st.markdown("###### Morada / Endereço (Opcional)")
+            c_addr_in, c_addr_btn = st.columns([3, 1])
+            addr_manual = c_addr_in.text_input("address_manual", label_visibility="collapsed", placeholder="Digite a morada para buscar coords...")
+            if c_addr_btn.button("📍 Buscar", help="Obter coordenadas desta morada"):
+                if addr_manual:
+                    a_lat, a_lon, a_full = search_place_nominatim(addr_manual)
+                    if a_lat:
+                        st.session_state['new_poi_lat'] = str(a_lat)
+                        st.session_state['new_poi_lon'] = str(a_lon)
+                        if not st.session_state['new_poi_name']:
+                            st.session_state['new_poi_name'] = addr_manual
+                        st.success("Coordenadas Preenchidas!")
+                        st.rerun()
+                    else:
+                        st.error("Morada inválida.")
+            # ----------------------------------------------------
+
             # Inputs vinculados ao Session State
             c_lat, c_lon = st.columns(2)
             raw_lat_poi = c_lat.text_input("Lat", key="new_poi_lat")
@@ -374,13 +403,19 @@ def render_city_planner(city_id):
             if st.button("💾 Salvar Local no Mapa", type="primary", use_container_width=True):
                 lat_final = parse_coordinate(raw_lat_poi)
                 lon_final = parse_coordinate(raw_lon_poi)
+                
+                # Se lat/lon vazios, tenta usar a morada manual se existir
+                if (lat_final is None or lon_final is None) and addr_manual:
+                     l, lo, _ = search_place_nominatim(addr_manual)
+                     if l: lat_final, lon_final = l, lo
+
                 if lat_final is not None and lon_final is not None:
                     if is_hotel:
                         for p in city['pois']: 
                             if p.get('type')=='hotel': p['type']='visit'
-                    city['pois'].append({"id":str(uuid.uuid4()), "name":name, "lat":lat_final, "lon":lon_final, "time_min":time, "cost":cost, "type":'hotel' if is_hotel else 'visit', "day":0})
+                    city['pois'].append({"id":str(uuid.uuid4()), "name":name if name else (addr_manual if addr_manual else "Sem Nome"), "lat":lat_final, "lon":lon_final, "time_min":time, "cost":cost, "type":'hotel' if is_hotel else 'visit', "day":0})
                     save_data(); st.success("Adicionado!"); st.rerun()
-                else: st.error("Coordenadas inválidas.")
+                else: st.error("Coordenadas inválidas e morada não encontrada.")
 
         with tabs[1]:
             st.markdown("""<style>.stExpander { border: none !important; box-shadow: none !important; } .element-container { margin-bottom: 0.5rem; }</style>""", unsafe_allow_html=True)

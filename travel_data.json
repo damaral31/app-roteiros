@@ -26,10 +26,10 @@
         "img": "https://www.grupodicas.com/wp-content/uploads/2023/07/23bf4300-f586-11e8-b8fa-0242ac11000d.png",
         "pois": [
             {
-                "id": "baa1eeb5-a2b1-4860-92c9-99d6e37c5132",
+                "id": "22cde748-ce46-46e3-970d-3bc79194af8a",
                 "name": "MEININGER Hotel Geneve Charmilles",
-                "lat": 46.209306,
-                "lon": 6.121528,
+                "lat": 46.209438466997376,
+                "lon": 6.12164318561554,
                 "type": "hotel",
                 "day": 0,
                 "period": "Base",
@@ -45,7 +45,7 @@
                 "type": "visit",
                 "day": 1,
                 "period": "Manhã",
-                "transit_prev": 11
+                "transit_prev": 1
             },
             {
                 "id": "7ccd4226-218f-4211-98da-b36905a36a69",
@@ -60,16 +60,16 @@
                 "transit_prev": 11
             },
             {
-                "id": "f1296694-33be-4884-b873-f0d27d583201",
-                "name": "Catedral de São Pedro de Genebra",
-                "lat": 46.2010858,
-                "lon": 6.1484997,
+                "id": "081de895-60c1-4919-b945-edeb30624187",
+                "name": "Parc des Bastons",
+                "lat": 46.200333,
+                "lon": 6.144417,
                 "time_min": 60,
                 "cost": 0.0,
                 "type": "visit",
                 "day": 1,
                 "period": "Manhã",
-                "transit_prev": 10
+                "transit_prev": 6
             },
             {
                 "id": "ce66dffd-f151-45a4-8323-0593c3c632c2",
@@ -81,7 +81,91 @@
                 "type": "visit",
                 "day": 1,
                 "period": "Manhã",
+                "transit_prev": 4
+            },
+            {
+                "id": "0c67a340-f394-4a82-a921-d87e6e1ff8a2",
+                "name": "Universidade de Genebra",
+                "lat": 46.19994527659558,
+                "lon": 6.1450883746147165,
+                "time_min": 60,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 1,
+                "period": "Tarde",
+                "transit_prev": 3
+            },
+            {
+                "id": "27d7c607-7a20-41e4-bc0f-bf5e0ba09788",
+                "name": "Muro dos Reformadores",
+                "lat": 46.20025901989191,
+                "lon": 6.145981550216676,
+                "time_min": 60,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 1,
+                "period": "Tarde",
                 "transit_prev": 0
+            },
+            {
+                "id": "36f8f0ac-2299-4cb9-9df0-fd0b9cdc8aae",
+                "name": "Museu Ariana",
+                "lat": 46.22541577000734,
+                "lon": 6.138761043548585,
+                "time_min": 60,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 2,
+                "period": "Manhã",
+                "transit_prev": 3
+            },
+            {
+                "id": "c004a8a6-620d-4821-a84e-df8532da2b36",
+                "name": "Broken Chair",
+                "lat": 46.222694,
+                "lon": 6.138806,
+                "time_min": 10,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 2,
+                "period": "Manhã",
+                "transit_prev": 3
+            },
+            {
+                "id": "734dbcae-347b-47d1-8038-16293c1c0f81",
+                "name": "Palácio das Nações Unidas",
+                "lat": 46.2265,
+                "lon": 6.140139,
+                "time_min": 120,
+                "cost": 20.0,
+                "type": "visit",
+                "day": 2,
+                "period": "Tarde",
+                "transit_prev": 5
+            },
+            {
+                "id": "f1296694-33be-4884-b873-f0d27d583201",
+                "name": "Catedral de São Pedro de Genebra",
+                "lat": 46.2010858,
+                "lon": 6.1484997,
+                "time_min": 60,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 3,
+                "period": "Manhã",
+                "transit_prev": 3
+            },
+            {
+                "id": "dc34869f-5c97-431f-ab24-99113ffa12b4",
+                "name": "Rue de Rhone (Lojas de Luxo)",
+                "lat": 46.20354486275257,
+                "lon": 6.150251626968385,
+                "time_min": 60,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 3,
+                "period": "Manhã",
+                "transit_prev": 3
             },
             {
                 "id": "abef63e7-9760-4928-b256-7ac4f585e2ae",
@@ -91,9 +175,33 @@
                 "time_min": 60,
                 "cost": 0.0,
                 "type": "visit",
-                "day": 1,
+                "day": 3,
+                "period": "Tarde",
+                "transit_prev": 1
+            },
+            {
+                "id": "9b5fcc95-0d52-493a-8da2-02b4341cce45",
+                "name": "Jardins do Palácio",
+                "lat": 46.225898227456824,
+                "lon": 6.144211292266847,
+                "time_min": 90,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 4,
                 "period": "Manhã",
-                "transit_prev": 5
+                "transit_prev": 4
+            },
+            {
+                "id": "fbfda051-760c-4c8d-99dc-02f5adfd881c",
+                "name": "CERN",
+                "lat": 46.2349649,
+                "lon": 6.0473162,
+                "time_min": 180,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 0,
+                "period": "-",
+                "transit_prev": 10
             },
             {
                 "id": "98e9124b-1e3e-40bb-a4ed-eec6a9fa4261",
@@ -103,9 +211,9 @@
                 "time_min": 300,
                 "cost": 0.0,
                 "type": "visit",
-                "day": 2,
-                "period": "Manhã",
-                "transit_prev": 88
+                "day": 0,
+                "period": "-",
+                "transit_prev": 12
             }
         ]
     }
