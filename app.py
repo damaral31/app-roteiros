@@ -214,7 +214,7 @@ def render_sidebar_login():
         if not st.session_state['authenticated']:
             password = st.text_input("Senha de Admin", type="password")
             if st.button("Entrar"):
-                if password == ADMIN_PASSWORD:
+                if password == st.secrets.get("ADMIN_PASSWORD"):
                     st.session_state['authenticated'] = True
                     st.success("Login efetuado!")
                     st.rerun()
