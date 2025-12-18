@@ -1,0 +1,22 @@
+9/11 Memorial & Museum,40.7115,-74.0131,60,31,visit
+World Trade Center (One WTC - Observatório),40.7127,-74.0134,20,42,visit
+Battery Park (Ferry p/ Estátua),40.7033,-74.0170,30,0,visit
+Statue of Liberty,40.6892,-74.0445,180,24,visit
+Wall Street,40.7060,-74.0088,20,0,visit
+Charging Bull,40.7056,-74.0134,15,0,visit
+Chinatown,40.7158,-73.9967,60,0,visit
+Empire State Building,40.7484,-73.9857,40,45,visit
+Times Square,40.7580,-73.9855,30,0,visit
+Grand Central Terminal,40.7527,-73.9772,30,0,visit
+Bryant Park,40.7536,-73.9832,40,0,visit
+New York Public Library,40.7532,-73.9822,40,0,visit
+Rockefeller Center,40.7587,-73.9787,30,0,visit
+St. Patrick's Cathedral,40.7585,-73.9762,20,0,visit
+Madison Square Garden (Tour),40.7505,-73.9934,10,35,visit
+Fifth Avenue (Apple Store/Plaza),40.7639,-73.9731,30,0,visit
+Broadway (Theater District - Passeio),40.7590,-73.9845,5,0,visit
+Central Park (Bethesda Terrace),40.7739,-73.9709,120,0,visit
+American Museum of Natural History,40.7813,-73.9740,150,26,visit
+Brooklyn Bridge (Entrada Manhattan),40.7081,-73.9983,45,0,visit
+DUMBO (Brooklyn),40.7033,-73.9896,15,0,visit
+Cambria Hotel,40°44'47.7"N,73°59'30.1"W,0,0,hotel

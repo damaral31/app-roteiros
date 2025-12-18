@@ -19,6 +19,14 @@ WALKING_SPEED_KMH = 5.0
 DRIVING_SPEED_KMH = 35.0  # Velocidade média carro em cidade (para Hotel -> POI)
 TOLERANCIA_MINUTOS = 30 
 
+# Configuração Visual dos Tipos
+TYPE_CONFIG = {
+    'hotel': {'label': 'Hotel', 'color': 'black', 'icon': 'home', 'fa': 'fa-home'},
+    'visit': {'label': 'Visita (Padrão)', 'color': 'blue', 'icon': 'camera', 'fa': 'fa-camera'},
+    'food': {'label': 'Restaurante', 'color': 'red', 'icon': 'cutlery', 'fa': 'fa-cutlery'},
+    'transport': {'label': 'Transporte', 'color': 'gray', 'icon': 'plane', 'fa': 'fa-plane'}
+}
+
 # --- FUNÇÃO DE CONVERSÃO DE COORDENADAS ---
 def parse_coordinate(coord_input):
     """Converte inputs variados (DMS string ou Float string) para Float Decimal."""
@@ -183,11 +191,27 @@ class TravelOptimizer:
 
 def run_optimization_logic(pois, max_h_manha, max_h_tarde):
     hotel = next((p for p in pois if p.get('type') == 'hotel'), None)
-    visit_pois = [p for p in pois if p.get('type') != 'hotel']
-    if not hotel: return None, "Defina um Hotel."
-    if not visit_pois: return pois, "Adicione locais."
+    
+    # --- FILTRAGEM DE OTIMIZAÇÃO ---
+    # Apenas inclui pontos do tipo 'visit' na otimização.
+    # Exclui 'food' e 'transport' da geração automática de roteiro.
+    visit_pois = [p for p in pois if p.get('type') == 'visit']
+    
+    if not hotel: return None, "Defina um Hotel/Base."
+    if not visit_pois: return pois, "Adicione locais do tipo 'Visita' para gerar roteiro."
+    
     optimizer = TravelOptimizer(visit_pois, hotel, max_h_manha, max_h_tarde)
-    return optimizer.solve_simulated_annealing(), "Otimização concluída!"
+    optimized_schedule, msg = optimizer.solve_simulated_annealing(), "Otimização concluída!"
+
+    # Reintegrar os itens não otimizados (restaurantes/transportes) na lista final para não sumirem
+    optimized_ids = set(p['id'] for p in optimized_schedule)
+    others = [p for p in pois if p['id'] not in optimized_ids]
+    # Garante que eles tenham day=0
+    for o in others:
+        o['day'] = 0
+        o['period'] = '-'
+    
+    return optimized_schedule + others, msg
 
 # --- UI COMPONENTS ---
 
@@ -243,8 +267,10 @@ def render_dashboard():
                     save_data(); st.toast("Removido!"); st.rerun()
 
 def render_stylish_card(poi, city_id, is_first=False):
-    """Renderiza um cartão visualmente rico para o Roteiro."""
-    if not is_first and 'transit_prev' in poi and poi['transit_prev'] > 0:
+    """Renderiza um cartão visualmente rico com controlo de movimentação manual."""
+    
+    # --- 1. Exibir tempo de deslocamento (se aplicável) ---
+    if not is_first and 'transit_prev' in poi and poi['transit_prev'] > 0 and poi.get('day', 0) > 0:
         icon_transit = "🚗" if poi.get('transit_prev') > 45 else "🚶"
         st.markdown(f"""
         <div style="text-align: center; color: #888; font-size: 0.8em; margin: 5px 0;">
@@ -253,27 +279,100 @@ def render_stylish_card(poi, city_id, is_first=False):
         """, unsafe_allow_html=True)
 
     with st.container(border=True):
-        col_icon, col_info, col_action = st.columns([1, 5, 1])
-        with col_icon:
-            icon = "🏨" if poi.get('type') == 'hotel' else "📍"
-            st.markdown(f"<div style='font-size: 2.5em; text-align: center; padding-top: 10px;'>{icon}</div>", unsafe_allow_html=True)
+        # Ajustamos as colunas: Ícone | Info | Seletor Mover | Botão Apagar
+        col_icon, col_info, col_move, col_action = st.columns([0.8, 4, 2, 0.5])
         
+        # --- COLUNA 1: ÍCONE ---
+        with col_icon:
+            p_type = poi.get('type', 'visit')
+            icon_char = "📍"
+            if p_type == 'hotel': icon_char = "🏨"
+            elif p_type == 'food': icon_char = "🍴"
+            elif p_type == 'transport': icon_char = "✈️"
+            
+            st.markdown(f"<div style='font-size: 2.2em; text-align: center; padding-top: 5px;'>{icon_char}</div>", unsafe_allow_html=True)
+        
+        # --- COLUNA 2: INFORMAÇÕES ---
         with col_info:
             st.markdown(f"**{poi['name']}**")
             tags = []
-            tags.append(f"⏱️ {poi['time_min']} min")
+            type_label = TYPE_CONFIG.get(poi.get('type', 'visit'), {}).get('label', 'Local')
+            tags.append(f"{type_label}")
+
+            if poi.get('type') == 'visit':
+                tags.append(f"⏱️ {poi['time_min']} min")
             if poi.get('cost', 0) > 0: tags.append(f"💶 {poi['cost']}€")
             
             if tags:
-                tags_html = "".join([f"<span style='background-color: #f0f2f6; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin-right: 5px; color: #444; border: 1px solid #e0e0e0;'>{t}</span>" for t in tags])
+                tags_html = "".join([f"<span style='background-color: #f0f2f6; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; margin-right: 5px; color: #444; border: 1px solid #e0e0e0;'>{t}</span>" for t in tags])
                 st.markdown(tags_html, unsafe_allow_html=True)
-            if poi.get('desc'): st.caption(poi['desc'][:70] + "..." if len(poi['desc']) > 70 else poi['desc'])
+            
+            if poi.get('desc'): 
+                st.caption(poi['desc'][:60] + "..." if len(poi['desc']) > 60 else poi['desc'])
 
+        # --- COLUNA 3: CONTROLO DE MOVIMENTAÇÃO (NOVA LÓGICA) ---
+        with col_move:
+            # Apenas mostra o seletor se não for o Hotel (Hotel é fixo na base)
+            if poi.get('type') != 'hotel':
+                # 1. Calcular o máximo dia existente para dar opções relevantes
+                all_pois = st.session_state['cities'][city_id]['pois']
+                max_day = max([p.get('day', 0) for p in all_pois] + [0])
+                # Oferece sempre até +1 dia do que o máximo atual (para permitir criar novo dia)
+                limit_day = max(max_day + 1, 3) 
+
+                # 2. Construir opções do Selectbox
+                # Formato: "Label Visível": (day_int, period_str)
+                move_options = {"📌 Não Agendado": (0, '-')}
+                
+                ordered_keys = ["📌 Não Agendado"]
+                for d in range(1, limit_day + 1):
+                    for per in ['Manhã', 'Tarde']:
+                        key_str = f"Dia {d} - {per}"
+                        ordered_keys.append(key_str)
+                        move_options[key_str] = (d, per)
+
+                # 3. Determinar o valor atual selecionado
+                current_val_str = "📌 Não Agendado"
+                if poi.get('day', 0) > 0:
+                    current_val_str = f"Dia {poi['day']} - {poi.get('period', 'Manhã')}"
+                
+                # Fallback caso o estado atual não esteja na lista (ex: Dia 20 gerado por erro)
+                if current_val_str not in ordered_keys:
+                    ordered_keys.append(current_val_str)
+                    move_options[current_val_str] = (poi['day'], poi.get('period', '-'))
+
+                # 4. Renderizar o Selectbox
+                selected_opt = st.selectbox(
+                    "Mover", 
+                    options=ordered_keys, 
+                    index=ordered_keys.index(current_val_str),
+                    key=f"mv_{poi['id']}", 
+                    label_visibility="collapsed",
+                    help="Mude o dia ou período manualmente"
+                )
+
+                # 5. Lógica de Atualização (Se mudou)
+                if selected_opt != current_val_str:
+                    new_day, new_period = move_options[selected_opt]
+                    
+                    # Atualiza o Session State diretamente
+                    target_poi = next(p for p in st.session_state['cities'][city_id]['pois'] if p['id'] == poi['id'])
+                    target_poi['day'] = new_day
+                    target_poi['period'] = new_period
+                    
+                    # Salva e Recarrega
+                    save_data()
+                    st.rerun()
+            else:
+                st.caption("Base Fixa")
+
+        # --- COLUNA 4: AÇÃO DE APAGAR ---
         with col_action:
-            st.write("")
-            if st.button("🗑️", key=f"del_sty_{poi['id']}", help="Remover"):
+            st.write("") # Espaçamento vertical
+            if st.button("🗑️", key=f"del_sty_{poi['id']}", help="Remover local definitivamente"):
                 st.session_state['cities'][city_id]['pois'] = [p for p in st.session_state['cities'][city_id]['pois'] if p['id'] != poi['id']]
-                save_data(); st.rerun()
+                save_data()
+                st.rerun()
 
 def render_city_planner(city_id):
     if city_id not in st.session_state['cities']:
@@ -299,13 +398,29 @@ def render_city_planner(city_id):
         m = folium.Map([city['lat'], city['lon']], zoom_start=13)
         
         for p in city['pois']:
-            color = 'black' if p.get('type') == 'hotel' else (DAY_COLORS[(p.get('day', 0) - 1) % len(DAY_COLORS)] if p.get('day', 0) > 0 else 'blue')
-            folium.Marker([p['lat'], p['lon']], popup=p['name'], icon=folium.Icon(color=color, icon='home' if p.get('type')=='hotel' else 'info-sign')).add_to(m)
+            # Lógica de Cor do Marcador Atualizada
+            p_type = p.get('type', 'visit')
+            day = p.get('day', 0)
+            
+            # Default colors from config
+            color = TYPE_CONFIG.get(p_type, {}).get('color', 'blue')
+            icon_name = TYPE_CONFIG.get(p_type, {}).get('icon', 'info-sign')
+            
+            # Override for scheduled 'visit' items
+            if p_type == 'visit' and day > 0:
+                color = DAY_COLORS[(day - 1) % len(DAY_COLORS)]
+            
+            folium.Marker(
+                [p['lat'], p['lon']], 
+                popup=f"{p['name']} ({TYPE_CONFIG.get(p_type,{}).get('label')})", 
+                icon=folium.Icon(color=color, icon=icon_name, prefix='fa')
+            ).add_to(m)
         
-        # Rotas
-        visit_pois = [p for p in city['pois'] if p.get('day', 0) > 0]
+        # Rotas (Apenas para itens visitáveis agendados)
+        visit_pois = [p for p in city['pois'] if p.get('day', 0) > 0 and p.get('type') == 'visit']
         days = sorted(list(set(p['day'] for p in visit_pois)))
         hotel = next((p for p in city['pois'] if p.get('type')=='hotel'), None)
+        
         for d in days:
             pts = [p for p in visit_pois if p['day'] == d]
             coords = []
@@ -371,10 +486,17 @@ def render_city_planner(city_id):
                         else: st.error("Não encontrado.")
 
             st.markdown("---")
-            is_hotel = st.checkbox("É o Hotel/Base?")
+            
+            # --- SELETOR DE TIPO (DROPDOWN) ---
+            type_options = list(TYPE_CONFIG.keys())
+            # Mapa reverso para labels bonitos
+            label_to_key = {v['label']: k for k, v in TYPE_CONFIG.items()}
+            selected_label = st.selectbox("Tipo de Local", list(label_to_key.keys()), index=1)
+            selected_type = label_to_key[selected_label]
+            
             name = st.text_input("Nome", key="new_poi_name")
             
-            # --- NOVA FEATURE: ADICIONAR POR ENDEREÇO MANUAL ---
+            # --- FEATURE ADICIONAR POR ENDEREÇO MANUAL ---
             st.markdown("###### Morada / Endereço (Opcional)")
             c_addr_in, c_addr_btn = st.columns([3, 1])
             addr_manual = c_addr_in.text_input("address_manual", label_visibility="collapsed", placeholder="Digite a morada para buscar coords...")
@@ -390,15 +512,18 @@ def render_city_planner(city_id):
                         st.rerun()
                     else:
                         st.error("Morada inválida.")
-            # ----------------------------------------------------
-
+            
             # Inputs vinculados ao Session State
             c_lat, c_lon = st.columns(2)
             raw_lat_poi = c_lat.text_input("Lat", key="new_poi_lat")
             raw_lon_poi = c_lon.text_input("Lon", key="new_poi_lon")
             
-            time = st.number_input("Duração (min)", value=0 if is_hotel else 60)
-            cost = st.number_input("Custo (€)", value=0.0)
+            # Apenas mostra duração se for visita
+            time_val = 60
+            if selected_type == 'visit':
+                time_val = st.number_input("Duração da Visita (min)", value=60)
+            
+            cost = st.number_input("Custo Estimado (€)", value=0.0)
             
             if st.button("💾 Salvar Local no Mapa", type="primary", use_container_width=True):
                 lat_final = parse_coordinate(raw_lat_poi)
@@ -406,21 +531,129 @@ def render_city_planner(city_id):
                 
                 # Se lat/lon vazios, tenta usar a morada manual se existir
                 if (lat_final is None or lon_final is None) and addr_manual:
-                     l, lo, _ = search_place_nominatim(addr_manual)
-                     if l: lat_final, lon_final = l, lo
+                      l, lo, _ = search_place_nominatim(addr_manual)
+                      if l: lat_final, lon_final = l, lo
 
                 if lat_final is not None and lon_final is not None:
-                    if is_hotel:
+                    # Se escolheu hotel, remove o status de hotel de outros
+                    if selected_type == 'hotel':
                         for p in city['pois']: 
                             if p.get('type')=='hotel': p['type']='visit'
-                    city['pois'].append({"id":str(uuid.uuid4()), "name":name if name else (addr_manual if addr_manual else "Sem Nome"), "lat":lat_final, "lon":lon_final, "time_min":time, "cost":cost, "type":'hotel' if is_hotel else 'visit', "day":0})
+                    
+                    city['pois'].append({
+                        "id":str(uuid.uuid4()), 
+                        "name":name if name else (addr_manual if addr_manual else "Sem Nome"), 
+                        "lat":lat_final, 
+                        "lon":lon_final, 
+                        "time_min":time_val, 
+                        "cost":cost, 
+                        "type":selected_type, 
+                        "day":0
+                    })
                     save_data(); st.success("Adicionado!"); st.rerun()
                 else: st.error("Coordenadas inválidas e morada não encontrada.")
+
+            # -----------------------------------------------
+            # --- UPLOAD DE FICHEIRO TXT ATUALIZADO ---
+            # -----------------------------------------------
+            st.markdown("---")
+            with st.expander("📂 Importar em Lote (.txt)", expanded=False):
+                st.caption("Formato: `Nome,Lat,Lon,Tempo,Custo,Tipo(visit/hotel/food/transport)`")
+                uploaded_file = st.file_uploader("Escolher ficheiro", type=['txt'], label_visibility="collapsed")
+                
+                if uploaded_file is not None:
+                    if st.button("📥 Processar Arquivo", use_container_width=True):
+                        try:
+                            stringio = uploaded_file.getvalue().decode("utf-8")
+                            lines = stringio.splitlines()
+                            count_ok = 0
+                            count_err = 0
+                            
+                            for line in lines:
+                                if not line.strip(): continue # Ignora linhas vazias
+                                parts = line.split(',')
+                                
+                                if len(parts) >= 3:
+                                    t_name = parts[0].strip()
+                                    t_lat_raw = parts[1].strip()
+                                    t_lon_raw = parts[2].strip()
+                                    
+                                    # Valores default
+                                    t_time = 60
+                                    t_cost = 0.0
+                                    t_type = 'visit'
+
+                                    # Tenta ler coluna 4 (Tempo)
+                                    if len(parts) >= 4 and parts[3].strip():
+                                        try: t_time = int(float(parts[3].strip()))
+                                        except: pass
+                                    
+                                    # Tenta ler coluna 5 (Custo)
+                                    if len(parts) >= 5 and parts[4].strip():
+                                        try: t_cost = float(parts[4].strip())
+                                        except: pass
+                                    
+                                    # Tenta ler coluna 6 (Tipo)
+                                    if len(parts) >= 6 and parts[5].strip():
+                                        raw_type = parts[5].strip().lower()
+                                        if raw_type in TYPE_CONFIG:
+                                            t_type = raw_type
+                                    
+                                    t_lat = parse_coordinate(t_lat_raw)
+                                    t_lon = parse_coordinate(t_lon_raw)
+                                    
+                                    if t_lat is not None and t_lon is not None:
+                                        # Se for hotel, garantir exclusividade
+                                        if t_type == 'hotel':
+                                            for p in city['pois']:
+                                                if p.get('type') == 'hotel': p['type'] = 'visit'
+
+                                        # Cria o POI
+                                        city['pois'].append({
+                                            "id": str(uuid.uuid4()),
+                                            "name": t_name,
+                                            "lat": t_lat,
+                                            "lon": t_lon,
+                                            "time_min": t_time,
+                                            "cost": t_cost,
+                                            "type": t_type,
+                                            "day": 0
+                                        })
+                                        count_ok += 1
+                                    else:
+                                        count_err += 1
+                                else:
+                                    count_err += 1
+                                    
+                            save_data()
+                            if count_ok > 0:
+                                st.success(f"{count_ok} locais importados com sucesso!")
+                                if count_err > 0: st.warning(f"{count_err} linhas ignoradas.")
+                                st.rerun() 
+                            else:
+                                st.error("Nenhum local válido encontrado.")
+                                
+                        except Exception as e:
+                            st.error(f"Erro ao ler ficheiro: {e}")
+            
+            # -----------------------------------------------
+            # --- NOVA FEATURE: REMOVER TUDO ---
+            # -----------------------------------------------
+            st.markdown("---")
+            st.markdown("### ⚠️ Zona de Perigo")
+            if st.button("🗑️ Remover TODOS os locais", type="primary", help="Apaga todos os POIs e o Hotel desta cidade"):
+                city['pois'] = []
+                save_data()
+                st.success("Todos os locais foram removidos.")
+                st.rerun()
 
         with tabs[1]:
             st.markdown("""<style>.stExpander { border: none !important; box-shadow: none !important; } .element-container { margin-bottom: 0.5rem; }</style>""", unsafe_allow_html=True)
             visitas = [p for p in city['pois'] if p.get('type')!='hotel']
-            days = sorted(list(set(p.get('day',0) for p in visitas)))
+            
+            # Ordenação do roteiro (dias > 0) e itens não agendados (day 0)
+            days = sorted(list(set(p.get('day',0) for p in city['pois'] if p.get('day', 0) > 0)))
+            
             hotel = next((p for p in city['pois'] if p.get('type') == 'hotel'), None)
             
             if hotel:
@@ -433,32 +666,43 @@ def render_city_planner(city_id):
 
             if not days and not visitas: st.info("O roteiro está vazio.")
             
+            # Renderiza dias
             for d in days:
-                if d == 0:
-                    st.markdown("---")
-                    with st.expander(f"📌 **Itens Não Agendados ({len([x for x in visitas if x.get('day')==0])})**", expanded=False):
-                        for p in [x for x in visitas if x.get('day')==0]: render_stylish_card(p, city_id, is_first=True)
-                else:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    p_dia = [x for x in visitas if x['day']==d]
-                    total_min = sum(p['time_min'] for p in p_dia)
-                    st.markdown(f"""<div style="background-color: #f0f8ff; padding: 15px; border-radius: 10px; border-left: 5px solid #007bff; margin-bottom: 20px;">
-                            <h4 style="margin:0; color: #004085;">🗓️ Dia {d}</h4>
-                            <span style="font-size: 0.9em; color: #555;">{len(p_dia)} Locais • Aprox. {total_min//60}h {total_min%60}m de visita</span>
-                        </div>""", unsafe_allow_html=True)
-                    
-                    for per_name, per_icon in [('Manhã', '🌅'), ('Tarde', '🌇')]:
-                        p_per = [x for x in p_dia if x.get('period') == per_name]
-                        if p_per:
-                            st.markdown(f"##### {per_icon} {per_name}")
-                            for idx, p in enumerate(p_per):
-                                is_first_item = (idx == 0) and (per_name == 'Manhã' or not [x for x in p_dia if x.get('period') == 'Manhã'])
-                                render_stylish_card(p, city_id, is_first=is_first_item)
-                            st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                p_dia = [x for x in visitas if x.get('day')==d]
+                total_min = sum(p.get('time_min',0) for p in p_dia)
+                st.markdown(f"""<div style="background-color: #f0f8ff; padding: 15px; border-radius: 10px; border-left: 5px solid #007bff; margin-bottom: 20px;">
+                        <h4 style="margin:0; color: #004085;">🗓️ Dia {d}</h4>
+                        <span style="font-size: 0.9em; color: #555;">{len(p_dia)} Locais • Aprox. {total_min//60}h {total_min%60}m de visita</span>
+                    </div>""", unsafe_allow_html=True)
+                
+                for per_name, per_icon in [('Manhã', '🌅'), ('Tarde', '🌇')]:
+                    p_per = [x for x in p_dia if x.get('period') == per_name]
+                    if p_per:
+                        st.markdown(f"##### {per_icon} {per_name}")
+                        for idx, p in enumerate(p_per):
+                            is_first_item = (idx == 0) and (per_name == 'Manhã' or not [x for x in p_dia if x.get('period') == 'Manhã'])
+                            render_stylish_card(p, city_id, is_first=is_first_item)
+                        st.markdown("<br>", unsafe_allow_html=True)
+
+            # Renderiza itens não agendados (Dia 0)
+            unscheduled = [x for x in city['pois'] if x.get('day', 0) == 0 and x.get('type') != 'hotel']
+            if unscheduled:
+                st.markdown("---")
+                with st.expander(f"📌 **Itens Não Agendados ({len(unscheduled)})**", expanded=True):
+                    # Agrupar por tipo para facilitar visualização
+                    for tipo_code in ['visit', 'food', 'transport']:
+                        grupo = [x for x in unscheduled if x.get('type') == tipo_code]
+                        if grupo:
+                            label_grupo = TYPE_CONFIG[tipo_code]['label']
+                            st.caption(f"**{label_grupo}**")
+                            for p in grupo: render_stylish_card(p, city_id, is_first=True)
 
         with tabs[2]:
             st.write("#### AI Optimizer")
             st.caption(f"Simulated Annealing | Tolerância: {TOLERANCIA_MINUTOS}min")
+            st.info("ℹ️ A otimização considera apenas locais do tipo **Visita**. Restaurantes e Transportes serão mantidos fora do agendamento automático.")
+            
             c1, c2 = st.columns(2)
             hm = c1.number_input("Horas Manhã", 1, 8, 4)
             ht = c2.number_input("Horas Tarde", 1, 8, 4)
