@@ -14,9 +14,7 @@ import re
 # --- CONFIGURAÇÃO E CONSTANTES ---
 st.set_page_config(page_title="AI Travel Planner", layout="wide", page_icon="🧠")
 
-# --- 🔒 CONFIGURAÇÃO DE SEGURANÇA ---
-ADMIN_PASSWORD = "admin"  # <--- ALTERE A SENHA AQUI
-# ------------------------------------
+
 
 DATA_FILE = "travel_data.json"
 WALKING_SPEED_KMH = 5.0
