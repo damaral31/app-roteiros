@@ -11,8 +11,7 @@ import math
 import random
 import re
 from fpdf import FPDF
-import matplotlib.pyplot as plt
-import io
+import tempfile
 
 # --- CONFIGURAÇÃO E CONSTANTES ---
 st.set_page_config(page_title="AI Travel Planner", layout="wide", page_icon="🧠")
@@ -21,6 +20,7 @@ DATA_FILE = "travel_data.json"
 WALKING_SPEED_KMH = 5.0
 DRIVING_SPEED_KMH = 35.0 
 TOLERANCIA_MINUTOS = 30 
+ADMIN_PASSWORD = "EuTenhoPermissao031#" 
 
 # Configuração Visual dos Tipos
 TYPE_CONFIG = {
@@ -54,7 +54,7 @@ def parse_coordinate(coord_input):
 def search_place_nominatim(query):
     """Pesquisa local usando OpenStreetMap (Gratuito)."""
     try:
-        geolocator = Nominatim(user_agent="travel_architect_ai_app_final_v6_pdf")
+        geolocator = Nominatim(user_agent="travel_architect_ai_app_final_v7_manual")
         location = geolocator.geocode(query, timeout=10)
         if location:
             return location.latitude, location.longitude, location.address
@@ -86,39 +86,26 @@ class PDFReport(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Pagina {self.page_no()}', 0, 0, 'C')
 
-def create_route_image(pois, day_color):
-    """Gera uma imagem estática da rota usando Matplotlib para o PDF."""
-    lats = [p['lat'] for p in pois]
-    lons = [p['lon'] for p in pois]
-    names = [str(i+1) for i in range(len(pois))]
+def clean_text(text):
+    """
+    Remove caracteres que não são suportados pelo padrão Latin-1 (como emojis).
+    """
+    if not text: return ""
+    return str(text).encode('latin-1', 'ignore').decode('latin-1')
 
-    plt.figure(figsize=(6, 4))
-    # Plotar linha
-    plt.plot(lons, lats, color=day_color, linestyle='-', linewidth=2, alpha=0.7, zorder=1)
-    # Plotar pontos
-    plt.scatter(lons, lats, color='black', zorder=2)
-    
-    # Anotar números
-    for i, txt in enumerate(names):
-        plt.annotate(txt, (lons[i], lats[i]), xytext=(5, 5), textcoords='offset points', fontsize=12, fontweight='bold')
 
-    plt.title(f"Rota Esquemática")
-    plt.axis('off') # Remove eixos para parecer um mapa limpo
-    plt.tight_layout()
-    
-    img_buf = io.BytesIO()
-    plt.savefig(img_buf, format='png', dpi=100)
-    plt.close()
-    return img_buf
-
-def generate_pdf(city):
+def generate_pdf(city, map_images):
+    """
+    Gera o PDF.
+    map_images: Dicionário { dia_int: uploaded_file_object }
+    """
     pdf = PDFReport()
     pdf.set_auto_page_break(auto=True, margin=15)
     
     # Capa
     pdf.add_page()
     pdf.set_font('Arial', 'B', 24)
-    pdf.cell(0, 20, f"Destino: {city['name']}", 0, 1, 'C')
+    pdf.cell(0, 20, f"Destino: {clean_text(city['name'])}", 0, 1, 'C')
     
     # Dados Gerais
     visit_pois = [p for p in city['pois'] if p.get('day', 0) > 0 and p.get('type') == 'visit']
@@ -133,28 +120,40 @@ def generate_pdf(city):
         pdf.cell(0, 10, f"Dia {day}", 0, 1, 'L', fill=True)
         pdf.ln(5)
 
-        # Filtrar POIs do dia
+        # 1. INSERIR IMAGEM DO MAPA (SE HOUVER UPLOAD)
+        if day in map_images and map_images[day] is not None:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                tmp.write(map_images[day].getvalue())
+                tmp_path = tmp.name
+            
+            try:
+                pdf.image(tmp_path, x=10, y=None, w=190)
+                pdf.ln(5)
+            except Exception as e:
+                pdf.set_font('Arial', 'I', 10)
+                pdf.cell(0, 10, f"Erro na imagem: {str(e)}", 0, 1)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+        else:
+            pdf.set_font('Arial', 'I', 10)
+            pdf.cell(0, 10, "(Sem imagem do mapa carregada para este dia)", 0, 1)
+
+        # 2. TABELA DE ROTEIRO
         day_pois = [p for p in city['pois'] if p.get('day') == day and p.get('type') == 'visit']
         
-        # Ordenar (assumindo que a ordem na lista é a ordem da rota)
-        # Se tiver hotel, adiciona no início e fim para calculo
         route_nodes = []
         if hotel: route_nodes.append(hotel)
         route_nodes.extend(day_pois)
         if hotel: route_nodes.append(hotel)
 
-        # --- Imagem da Rota ---
-        img_buf = create_route_image(route_nodes, 'blue')
-        pdf.image(img_buf, x=10, y=None, w=100)
         pdf.ln(5)
-
-        # --- Tabela de Roteiro ---
         pdf.set_font('Arial', 'B', 10)
         pdf.cell(10, 8, "#", 1)
         pdf.cell(70, 8, "Local", 1)
-        pdf.cell(30, 8, "Duração", 1)
+        pdf.cell(30, 8, "Duracao", 1) 
         pdf.cell(40, 8, "Deslocamento", 1)
-        pdf.cell(30, 8, "Distância", 1)
+        pdf.cell(30, 8, "Distancia", 1)
         pdf.ln()
 
         pdf.set_font('Arial', '', 10)
@@ -162,7 +161,6 @@ def generate_pdf(city):
         total_km = 0
         total_transit_min = 0
         
-        # Iterar sobre a rota (nós)
         for i in range(len(route_nodes) - 1):
             curr = route_nodes[i]
             next_p = route_nodes[i+1]
@@ -174,34 +172,34 @@ def generate_pdf(city):
             transit_time = int((dist / speed) * 60)
             total_transit_min += transit_time
 
-            # Se for o último ponto (retorno ao hotel), não lista como visita, apenas deslocamento
             is_return = (i == len(route_nodes) - 2) and next_p.get('type') == 'hotel'
             
             if not is_return:
-                # O item atual é o ponto de partida do trecho, o próximo é o destino
-                # Na tabela vamos listar o destino (next_p)
                 label_name = next_p['name']
                 duration = f"{next_p.get('time_min', 0)} min"
                 
-                # Se for hotel, label diferente
                 if next_p.get('type') == 'hotel':
                     label_name = "Retorno ao Hotel"
                     duration = "-"
 
                 pdf.cell(10, 8, str(i+1), 1)
-                pdf.cell(70, 8, label_name[:35], 1)
+                pdf.cell(70, 8, clean_text(label_name)[:35], 1)
                 pdf.cell(30, 8, duration, 1)
                 pdf.cell(40, 8, f"{transit_time} min", 1)
                 pdf.cell(30, 8, f"{dist:.2f} km", 1)
                 pdf.ln()
         
-        # Totais do Dia
         pdf.ln(5)
         pdf.set_font('Arial', 'B', 11)
         pdf.cell(0, 10, f"Resumo Dia {day}: {total_km:.1f} km percorridos | ~{total_transit_min // 60}h {total_transit_min % 60}m em deslocamentos", 0, 1)
 
     # --- FOOD SPOTS ---
+    # Filtra apenas os restaurantes
     food_spots = [p for p in city['pois'] if p.get('type') == 'food']
+    
+    # Filtra todas as visitas (para calcular a proximidade)
+    all_visits = [p for p in city['pois'] if p.get('type') == 'visit']
+
     if food_spots:
         pdf.add_page()
         pdf.set_font('Arial', 'B', 16)
@@ -211,14 +209,38 @@ def generate_pdf(city):
         
         pdf.set_font('Arial', '', 11)
         for f in food_spots:
+            # Lógica para encontrar o POI de visita mais próximo
+            nearest_name = ""
+            min_dist = float('inf') # Infinito positivo
+
+            if all_visits:
+                for v in all_visits:
+                    # Calcula distância geodésica
+                    d = geodesic((f['lat'], f['lon']), (v['lat'], v['lon'])).km
+                    if d < min_dist:
+                        min_dist = d
+                        nearest_name = v['name']
+            
+            # Formatando o texto
+            f_name_clean = clean_text(f['name'])
+            
+            if nearest_name and min_dist != float('inf'):
+                # Ex: "McDonalds - a 0.5 km de Torre Eiffel"
+                ref_clean = clean_text(nearest_name)
+                line_str = f"{f_name_clean} - a {min_dist:.1f} km de {ref_clean}"
+            else:
+                line_str = f"{f_name_clean}"
+
             pdf.set_text_color(200, 0, 0)
-            pdf.cell(0, 8, f"🍴 {f['name']}", 0, 1)
+            pdf.cell(0, 8, line_str, 0, 1)
+            
             pdf.set_text_color(0, 0, 0)
             if f.get('desc'):
-                pdf.multi_cell(0, 6, f"   {f['desc']}")
+                pdf.multi_cell(0, 6, f"   {clean_text(f['desc'])}")
             pdf.ln(2)
 
     return pdf.output(dest="S").encode("latin-1")
+
 
 # --- MOTOR DE OTIMIZAÇÃO (SIMULATED ANNEALING) ---
 
@@ -362,7 +384,7 @@ def render_sidebar_login():
         if not st.session_state['authenticated']:
             password = st.text_input("Senha de Admin", type="password")
             if st.button("Entrar"):
-                if password == st.secrets.get("ADMIN_PASSWORD", "admin"): # Fallback para 'admin' se não houver secrets
+                if password == ADMIN_PASSWORD:
                     st.session_state['authenticated'] = True
                     st.success("Login efetuado!")
                     st.rerun()
@@ -417,7 +439,7 @@ def render_dashboard():
 
     for idx, (cid, city) in enumerate(city_items):
         with cols[idx % 3].container(border=True):
-            st.image(city['img'], use_container_width=True)
+            st.image(city['img'])
             st.markdown(f"### {city['name']}")
             
             if st.session_state.get('authenticated'):
@@ -524,9 +546,7 @@ def render_city_planner(city_id):
     city = st.session_state['cities'][city_id]
     is_auth = st.session_state.get('authenticated', False)
     
-    # Inicializar estado de troca
     if 'swap_source' not in st.session_state: st.session_state['swap_source'] = None
-    
     if 'new_poi_name' not in st.session_state: st.session_state['new_poi_name'] = ""
     if 'new_poi_lat' not in st.session_state: st.session_state['new_poi_lat'] = str(city['lat'])
     if 'new_poi_lon' not in st.session_state: st.session_state['new_poi_lon'] = str(city['lon'])
@@ -539,38 +559,64 @@ def render_city_planner(city_id):
     col_map, col_data = st.columns([1.5, 1])
 
     with col_map:
+        # --- FILTRO DE VISUALIZAÇÃO DE MAPA ---
+        active_days = sorted(list(set(p['day'] for p in city['pois'] if p.get('day', 0) > 0)))
+        filter_options = ["Todos"] + [f"Dia {d}" for d in active_days]
+        
+        c_filter, _ = st.columns([2, 1])
+        selected_view = c_filter.radio("Visualizar Rota:", filter_options, horizontal=True)
+
         DAY_COLORS = ['green', 'purple', 'orange', 'red', 'darkblue', 'cadetblue', 'darkred']
         m = folium.Map([city['lat'], city['lon']], zoom_start=13)
         
+        # Determinar qual o dia a filtrar (0 se Todos)
+        filter_day_int = 0
+        if selected_view.startswith("Dia"):
+            filter_day_int = int(selected_view.split(" ")[1])
+
+        # Adicionar Marcadores
         for p in city['pois']:
             p_type = p.get('type', 'visit')
             day = p.get('day', 0)
-            color = TYPE_CONFIG.get(p_type, {}).get('color', 'blue')
-            icon_name = TYPE_CONFIG.get(p_type, {}).get('icon', 'info-sign')
-            if p_type == 'visit' and day > 0: color = DAY_COLORS[(day - 1) % len(DAY_COLORS)]
             
-            # Highlight selection for swap
-            if st.session_state['swap_source'] == p['id']:
-                icon_name = 'star'
-                color = 'gold'
+            # Lógica de Filtro:
+            # Se Todos: mostra tudo.
+            # Se Dia X: mostra Hotel + POIs do Dia X. Esconde o resto.
+            show_poi = True
+            if filter_day_int > 0:
+                if p_type == 'hotel': show_poi = True
+                elif day == filter_day_int: show_poi = True
+                else: show_poi = False
+            
+            if show_poi:
+                color = TYPE_CONFIG.get(p_type, {}).get('color', 'blue')
+                icon_name = TYPE_CONFIG.get(p_type, {}).get('icon', 'info-sign')
+                if p_type == 'visit' and day > 0: color = DAY_COLORS[(day - 1) % len(DAY_COLORS)]
                 
-            folium.Marker([p['lat'], p['lon']], popup=f"{p['name']}", icon=folium.Icon(color=color, icon=icon_name, prefix='fa')).add_to(m)
+                # Highlight selection for swap
+                if st.session_state['swap_source'] == p['id']:
+                    icon_name = 'star'
+                    color = 'gold'
+                    
+                folium.Marker([p['lat'], p['lon']], popup=f"{p['name']}", icon=folium.Icon(color=color, icon=icon_name, prefix='fa')).add_to(m)
         
+        # Adicionar Polylines (Rotas)
         visit_pois = [p for p in city['pois'] if p.get('day', 0) > 0 and p.get('type') == 'visit']
         days = sorted(list(set(p['day'] for p in visit_pois)))
         hotel = next((p for p in city['pois'] if p.get('type')=='hotel'), None)
         
         for d in days:
-            # Devemos pegar a ordem como está na lista para desenhar a linha corretamente
-            pts = [p for p in city['pois'] if p.get('day') == d and p.get('type') == 'visit']
-            coords = []
-            if hotel: coords.append([hotel['lat'], hotel['lon']])
-            coords.extend([[p['lat'], p['lon']] for p in pts])
-            if hotel: coords.append([hotel['lat'], hotel['lon']])
-            
-            if len(coords) > 1:
-                line_color = DAY_COLORS[(d - 1) % len(DAY_COLORS)]
-                folium.PolyLine(coords, color=line_color, weight=5, opacity=0.8, tooltip=f"Rota Dia {d}").add_to(m)
+            # Se estiver a filtrar por dia, só desenha a linha desse dia
+            if filter_day_int == 0 or filter_day_int == d:
+                pts = [p for p in city['pois'] if p.get('day') == d and p.get('type') == 'visit']
+                coords = []
+                if hotel: coords.append([hotel['lat'], hotel['lon']])
+                coords.extend([[p['lat'], p['lon']] for p in pts])
+                if hotel: coords.append([hotel['lat'], hotel['lon']])
+                
+                if len(coords) > 1:
+                    line_color = DAY_COLORS[(d - 1) % len(DAY_COLORS)]
+                    folium.PolyLine(coords, color=line_color, weight=5, opacity=0.8, tooltip=f"Rota Dia {d}").add_to(m)
             
         map_data = st_folium(m, height=500, use_container_width=True)
         
@@ -584,7 +630,6 @@ def render_city_planner(city_id):
                     if math.isclose(p['lat'], lat_click, abs_tol=0.0001) and math.isclose(p['lon'], lon_click, abs_tol=0.0001):
                         clicked_poi = p; break
 
-            # Novo POI por clique
             if map_data.get("last_clicked") and not clicked_poi:
                 new_lat = str(map_data["last_clicked"]["lat"])
                 new_lon = str(map_data["last_clicked"]["lng"])
@@ -598,35 +643,25 @@ def render_city_planner(city_id):
                 st.info(f"📍 Selecionado: **{clicked_poi['name']}**")
                 
                 c_swap, c_del = st.columns(2)
-                
-                # Botão de Swap
                 with c_swap:
                     if st.session_state['swap_source'] is None:
                         if st.button("🔄 Selecionar p/ Troca"):
                             st.session_state['swap_source'] = clicked_poi['id']
                             st.rerun()
                     else:
-                        # Se já existe um source
                         if st.session_state['swap_source'] == clicked_poi['id']:
                             if st.button("❌ Cancelar Seleção"):
                                 st.session_state['swap_source'] = None
                                 st.rerun()
                         else:
-                            # Swap Action
                             source_p = next((p for p in city['pois'] if p['id'] == st.session_state['swap_source']), None)
                             if source_p:
                                 if st.button(f"🔀 Trocar com '{source_p['name']}'"):
-                                    # Encontrar índices
                                     idx_source = city['pois'].index(source_p)
                                     idx_target = city['pois'].index(clicked_poi)
-                                    
-                                    # Trocar na lista
                                     city['pois'][idx_source], city['pois'][idx_target] = city['pois'][idx_target], city['pois'][idx_source]
-                                    
-                                    # Trocar atributos de agendamento também para manter coerência visual
                                     city['pois'][idx_source]['day'], city['pois'][idx_target]['day'] = city['pois'][idx_target]['day'], city['pois'][idx_source]['day']
                                     city['pois'][idx_source]['period'], city['pois'][idx_target]['period'] = city['pois'][idx_target]['period'], city['pois'][idx_source]['period']
-
                                     st.session_state['swap_source'] = None
                                     save_data()
                                     st.success("Trocado!")
@@ -729,9 +764,7 @@ def render_city_planner(city_id):
             
             for d in days:
                 st.markdown("<br>", unsafe_allow_html=True)
-                # IMPORTANTE: Manter ordem da lista, pois o swap altera a lista
                 p_dia = [x for x in city['pois'] if x.get('day')==d and x.get('type') == 'visit']
-                
                 total_min = sum(p.get('time_min',0) for p in p_dia)
                 st.markdown(f"""<div style="background-color: #f0f8ff; padding: 15px; border-radius: 10px; border-left: 5px solid #007bff; margin-bottom: 20px;">
                         <h4 style="margin:0; color: #004085;">🗓️ Dia {d}</h4>
@@ -778,20 +811,33 @@ def render_city_planner(city_id):
         # --- ABA 4: PDF ---
         with tabs[3]:
             st.header("📄 Exportar Roteiro")
-            st.write("Gera um PDF detalhado com rotas, tempos de deslocamento e lista de restaurantes.")
+            st.info("Para obter o mapa no PDF: Use o filtro 'Visualizar Rota' acima do mapa para isolar cada dia, tire um print screen e carregue a imagem aqui.")
             
-            if st.button("🖨️ Gerar PDF"):
-                with st.spinner("A gerar documento..."):
-                    try:
-                        pdf_bytes = generate_pdf(city)
-                        st.download_button(
-                            label="📥 Baixar PDF",
-                            data=pdf_bytes,
-                            file_name=f"roteiro_{city['name']}.pdf",
-                            mime="application/pdf"
-                        )
-                    except Exception as e:
-                        st.error(f"Erro ao gerar PDF: {e}")
+            # Identificar dias ativos
+            visit_pois = [p for p in city['pois'] if p.get('day', 0) > 0 and p.get('type') == 'visit']
+            active_days_pdf = sorted(list(set(p['day'] for p in visit_pois)))
+            
+            uploaded_maps = {}
+            
+            if not active_days_pdf:
+                st.warning("Nenhum roteiro definido. Adicione visitas a dias para gerar o PDF.")
+            else:
+                for day in active_days_pdf:
+                    uploaded_maps[day] = st.file_uploader(f"📸 Imagem do Mapa - Dia {day}", type=['png', 'jpg', 'jpeg'], key=f"uploader_{day}")
+                
+                st.markdown("---")
+                if st.button("🖨️ Gerar PDF"):
+                    with st.spinner("A gerar documento..."):
+                        try:
+                            pdf_bytes = generate_pdf(city, uploaded_maps)
+                            st.download_button(
+                                label="📥 Baixar PDF",
+                                data=pdf_bytes,
+                                file_name=f"roteiro_{city['name']}.pdf",
+                                mime="application/pdf"
+                            )
+                        except Exception as e:
+                            st.error(f"Erro ao gerar PDF: {e}")
 
 # --- MAIN ---
 if 'cities' not in st.session_state: st.session_state['cities'] = load_data()

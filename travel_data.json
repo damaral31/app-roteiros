@@ -41,18 +41,6 @@
                 "transit_prev": 7
             },
             {
-                "id": "ee5acb2e-14f2-4407-8e0f-104df12e6dbd",
-                "name": "Grand Central Terminal",
-                "lat": 40.7527,
-                "lon": -73.9772,
-                "time_min": 30,
-                "cost": 0.0,
-                "type": "visit",
-                "day": 1,
-                "period": "Manhã",
-                "transit_prev": 6
-            },
-            {
                 "id": "a34276fc-7e91-44bc-9977-18b33468916e",
                 "name": "New York Public Library",
                 "lat": 40.7532,
@@ -63,6 +51,18 @@
                 "day": 1,
                 "period": "Manhã",
                 "transit_prev": 5
+            },
+            {
+                "id": "ee5acb2e-14f2-4407-8e0f-104df12e6dbd",
+                "name": "Grand Central Terminal",
+                "lat": 40.7527,
+                "lon": -73.9772,
+                "time_min": 30,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 1,
+                "period": "Manhã",
+                "transit_prev": 6
             },
             {
                 "id": "b1ff0d37-5a26-473e-8f15-d85b43576fb9",
@@ -101,18 +101,6 @@
                 "transit_prev": 8
             },
             {
-                "id": "29085346-6d7c-4b8a-ae1f-fe87c7459e18",
-                "name": "Times Square",
-                "lat": 40.758,
-                "lon": -73.9855,
-                "time_min": 30,
-                "cost": 0.0,
-                "type": "visit",
-                "day": 1,
-                "period": "Manhã",
-                "transit_prev": 6
-            },
-            {
                 "id": "a663e1c7-6f48-46e3-b837-a5fd10aee1bf",
                 "name": "Broadway (Theater District - Passeio)",
                 "lat": 40.759,
@@ -123,6 +111,18 @@
                 "day": 1,
                 "period": "Manhã",
                 "transit_prev": 1
+            },
+            {
+                "id": "29085346-6d7c-4b8a-ae1f-fe87c7459e18",
+                "name": "Times Square",
+                "lat": 40.758,
+                "lon": -73.9855,
+                "time_min": 30,
+                "cost": 0.0,
+                "type": "visit",
+                "day": 1,
+                "period": "Manhã",
+                "transit_prev": 6
             },
             {
                 "id": "47dc57c7-a4c3-4db6-bf1d-8fe53492a6e5",
