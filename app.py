@@ -579,9 +579,6 @@ def render_city_planner(city_id):
             p_type = p.get('type', 'visit')
             day = p.get('day', 0)
             
-            # Lógica de Filtro:
-            # Se Todos: mostra tudo.
-            # Se Dia X: mostra Hotel + POIs do Dia X. Esconde o resto.
             show_poi = True
             if filter_day_int > 0:
                 if p_type == 'hotel': show_poi = True
@@ -593,7 +590,6 @@ def render_city_planner(city_id):
                 icon_name = TYPE_CONFIG.get(p_type, {}).get('icon', 'info-sign')
                 if p_type == 'visit' and day > 0: color = DAY_COLORS[(day - 1) % len(DAY_COLORS)]
                 
-                # Highlight selection for swap
                 if st.session_state['swap_source'] == p['id']:
                     icon_name = 'star'
                     color = 'gold'
@@ -606,7 +602,6 @@ def render_city_planner(city_id):
         hotel = next((p for p in city['pois'] if p.get('type')=='hotel'), None)
         
         for d in days:
-            # Se estiver a filtrar por dia, só desenha a linha desse dia
             if filter_day_int == 0 or filter_day_int == d:
                 pts = [p for p in city['pois'] if p.get('day') == d and p.get('type') == 'visit']
                 coords = []
@@ -742,6 +737,74 @@ def render_city_planner(city_id):
                     else: st.error("Coordenadas inválidas.")
 
                 st.markdown("---")
+                
+                # ### NOVO: IMPORTAÇÃO TXT ###
+                st.markdown("##### 📂 Importar Lista (.txt)")
+                st.caption("Formato: `Nome, Latitude, Longitude, Minutos, Custo, Tipo`")
+                st.caption("Exemplo: `Torre, 41.14, -8.61, 60, 5.0, visit`")
+                
+                uploaded_file = st.file_uploader("Carregar Arquivo", type=['txt'], key="txt_upload")
+                
+                if uploaded_file is not None:
+                    if st.button("📥 Processar Arquivo", use_container_width=True):
+                        try:
+                            stringio = uploaded_file.getvalue().decode("utf-8")
+                            lines = stringio.splitlines()
+                            count = 0
+                            errors = 0
+                            
+                            for line in lines:
+                                if not line.strip(): continue
+                                parts = [p.strip() for p in line.split(',')]
+                                
+                                # Verifica se tem as 6 colunas mínimas
+                                if len(parts) >= 6:
+                                    try:
+                                        n_name = parts[0]
+                                        n_lat = float(parts[1])
+                                        n_lon = float(parts[2])
+                                        n_time = int(parts[3])
+                                        n_cost = float(parts[4])
+                                        n_type = parts[5].lower()
+                                        
+                                        # Valida tipo
+                                        if n_type not in TYPE_CONFIG:
+                                            n_type = 'visit' # fallback
+                                            
+                                        # Se for hotel, remove o hotel anterior
+                                        if n_type == 'hotel':
+                                             for p in city['pois']:
+                                                 if p.get('type') == 'hotel': p['type'] = 'visit'
+
+                                        city['pois'].append({
+                                            "id": str(uuid.uuid4()),
+                                            "name": n_name,
+                                            "lat": n_lat,
+                                            "lon": n_lon,
+                                            "time_min": n_time,
+                                            "cost": n_cost,
+                                            "type": n_type,
+                                            "day": 0,
+                                            "period": "-"
+                                        })
+                                        count += 1
+                                    except ValueError:
+                                        errors += 1
+                                else:
+                                    errors += 1
+                                    
+                            save_data()
+                            if count > 0:
+                                st.success(f"✅ {count} locais importados com sucesso!")
+                                if errors > 0: st.warning(f"⚠️ {errors} linhas ignoradas (formato inválido).")
+                                st.rerun()
+                            else:
+                                st.error("Nenhum local válido encontrado. Verifique o formato.")
+                                
+                        except Exception as e:
+                            st.error(f"Erro ao ler arquivo: {e}")
+
+                st.markdown("---")
                 if st.button("🗑️ Remover TODOS os locais", type="primary"):
                     city['pois'] = []; save_data(); st.rerun()
             else:
@@ -838,6 +901,7 @@ def render_city_planner(city_id):
                             )
                         except Exception as e:
                             st.error(f"Erro ao gerar PDF: {e}")
+
 
 # --- MAIN ---
 if 'cities' not in st.session_state: st.session_state['cities'] = load_data()
